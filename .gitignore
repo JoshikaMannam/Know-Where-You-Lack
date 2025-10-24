@@ -1,0 +1,34 @@
+﻿# Large data files
+data/raw/ou_data/*.csv
+data/raw/ou_data/*.zip
+data/raw/ai_course_data/**/*.csv
+data/raw/uci_data/*.csv
+data/raw/uci_data/*.zip
+data/processed/*.csv
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Virtual Environment
+venv/
+env/
+
+# Model files
+models/*.pkl
+
+# IDE settings
+.vscode/
+.idea/
+
+# Log files
+*.log
+
+# Jupyter Notebook
+.ipynb_checkpoints
