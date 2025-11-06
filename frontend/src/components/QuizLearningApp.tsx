@@ -1,17 +1,12 @@
 import { useState, useEffect } from 'react';
-import { BookOpen, MessageSquare, BarChart3, Plus, User, LogOut, ChevronRight, Check, X, Send } from 'lucide-react';
+import { BookOpen, MessageSquare, BarChart3, Plus, User, LogOut, ChevronRight, Check, X, Send, FileText } from 'lucide-react';
+import '../styles/Chatbot.css';
+import '../styles/Quiz.css';
+import '../styles/Dashboard.css';
+import '../styles/Notes.css';
 
 // Temporarily point frontend to backend port 8082 to avoid conflicts with services
 const API_BASE_URL = 'http://localhost:8082/api';
-
-interface AuthResponse {
-  token: string;
-  user: {
-    id: number;
-    email: string;
-    fullName: string;
-  };
-}
 
 interface ApiError {
   message: string;
@@ -46,26 +41,51 @@ const api = {
   }
 };
 
+// Format chatbot response to have proper paragraphs and bullets
+const formatMessage = (text: string): string => {
+  // Split by double newlines for paragraphs
+  const formatted = text.split('\n\n').map(para => {
+    para = para.trim();
+    
+    // Check if it's a bullet point list
+    if (para.includes('\n-') || para.includes('\n•') || para.includes('\n*')) {
+      const lines = para.split('\n');
+      let html = '<ul>';
+      lines.forEach(line => {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('-') || trimmed.startsWith('•') || trimmed.startsWith('*')) {
+          html += `<li>${trimmed.substring(1).trim()}</li>`;
+        } else if (trimmed) {
+          html += `<li>${trimmed}</li>`;
+        }
+      });
+      html += '</ul>';
+      return html;
+    }
+    
+    // Check if it's a numbered list
+    if (/^\d+\./.test(para)) {
+      const lines = para.split('\n');
+      let html = '<ol>';
+      lines.forEach(line => {
+        const trimmed = line.trim();
+        if (/^\d+\./.test(trimmed)) {
+          html += `<li>${trimmed.replace(/^\d+\.\s*/, '')}</li>`;
+        }
+      });
+      html += '</ol>';
+      return html;
+    }
+    
+    // Regular paragraph
+    return `<p>${para}</p>`;
+  }).join('');
+  
+  return formatted;
+};
+
 export default function QuizLearningApp() {
-  type View = 'login' | 'dashboard' | 'quiz' | 'chat' | 'analysis' | 'chatbot' | 'analytics' | 'results';
-
-  interface BaseResponse {
-    success: boolean;
-    message?: string;
-  }
-
-  interface TopicsResponse extends BaseResponse {
-    topics: Topic[];
-  }
-
-  interface QuizResponse extends BaseResponse {
-    quiz: Quiz;
-  }
-
-  interface ResultResponse extends BaseResponse {
-    score: number;
-    feedback: string;
-  }
+  type View = 'login' | 'dashboard' | 'quiz' | 'chat' | 'analysis' | 'chatbot' | 'analytics' | 'results' | 'notes';
 
   interface User {
     id: number;
@@ -106,10 +126,18 @@ export default function QuizLearningApp() {
     timestamp: Date;
   }
 
+  interface Note {
+    id: number;
+    title: string;
+    content: string;
+    subject: string;
+    createdAt: string;
+    updatedAt: string;
+  }
+
   const [currentView, setCurrentView] = useState<View>('login');
   const [user, setUser] = useState<User | null>(null);
   const [topics, setTopics] = useState<Topic[]>([]);
-  const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [score, setScore] = useState(0);
@@ -247,9 +275,32 @@ export default function QuizLearningApp() {
 
     const loadTopics = async () => {
       try {
-        const response = await api.get<TopicsResponse>('/topics');
-        setTopics(response.topics);
-      } catch {
+        console.log('🔍 Loading topics from backend...');
+        // Call backend endpoint: GET /api/quiz/topics
+        const response = await api.get<Array<{
+          topicId: number;
+          topicName: string;
+          difficultyLevel: string;
+          description: string;
+          questionCount: number;
+        }>>('/quiz/topics');
+        
+        console.log(`✅ Received ${response.length} topics from backend`);
+        
+        // Transform backend response to frontend Topic format
+        const transformedTopics = response.map(t => ({
+          id: t.topicId,
+          name: t.topicName,
+          description: t.description || 'No description available',
+          quizCount: t.questionCount
+        }));
+        
+        setTopics(transformedTopics);
+        console.log(`📝 Loaded topics:`, transformedTopics);
+        
+      } catch (error) {
+        console.error('❌ Error loading topics:', error);
+        // Fallback to demo topics
         setTopics([
           { id: 1, name: 'JavaScript Fundamentals', description: 'Learn the basics of JavaScript', quizCount: 5 },
           { id: 2, name: 'React Hooks', description: 'Master React Hooks', quizCount: 3 },
@@ -270,45 +321,52 @@ export default function QuizLearningApp() {
     };
 
     const startQuiz = (topic: Topic) => {
-      setSelectedTopic(topic);
       setCurrentView('quiz');
       loadQuiz(topic.id);
     };
 
     const loadQuiz = async (topicId: number) => {
       try {
-        const data = await api.get<QuizResponse>(`/quizzes/topic/${topicId}`);
-        setQuiz(data.quiz);
-      } catch {
+        console.log(`🔍 Loading 10 questions for topic ${topicId}...`);
+        
+        // Call backend endpoint: /api/quiz/{topicId}?questionCount=10
+        const data = await api.get<Array<{
+          id: number;
+          questionText: string;
+          options: string[];
+        }>>(`/quiz/${topicId}?questionCount=10`);
+        
+        console.log(`✅ Received ${data.length} questions from backend`);
+        
+        // Transform backend response to frontend Quiz format
+        const transformedQuiz: Quiz = {
+          id: topicId,
+          title: topics.find(t => t.id === topicId)?.name || 'Quiz',
+          questions: data.map((q) => ({
+            id: q.id,
+            question: q.questionText,
+            options: q.options,
+            correctAnswer: 0
+          }))
+        };
+        
+        console.log(`📝 Quiz loaded with ${transformedQuiz.questions.length} questions`);
+        setQuiz(transformedQuiz);
+        
+      } catch (error) {
+        console.error('❌ Error loading quiz:', error);
         setQuiz({
           id: 1,
           title: topics.find(t => t.id === topicId)?.name || 'Quiz',
           questions: [
             {
               id: 1,
-              question: 'What is a closure in JavaScript?',
+              question: 'Error loading questions from database.',
               options: [
-                'A function that has access to variables in its outer scope',
-                'A way to close browser windows',
-                'A loop that never ends',
-                'A type of CSS property'
-              ],
-              correctAnswer: 0
-            },
-            {
-              id: 2,
-              question: 'Which hook is used for side effects in React?',
-              options: ['useState', 'useEffect', 'useContext', 'useReducer'],
-              correctAnswer: 1
-            },
-            {
-              id: 3,
-              question: 'What does REST stand for?',
-              options: [
-                'Representational State Transfer',
-                'Remote Execution Service Transfer',
-                'Recursive Entity State Transformation',
-                'Reliable Execution Standard Technology'
+                'Please check backend connection',
+                'Database might be empty',
+                'Backend server not running',
+                'Network error occurred'
               ],
               correctAnswer: 0
             }
@@ -329,6 +387,10 @@ export default function QuizLearningApp() {
               <button onClick={() => setCurrentView('chatbot')} className="flex items-center space-x-2 text-gray-700 hover:text-indigo-600 transition-colors">
                 <MessageSquare className="w-5 h-5" />
                 <span>AI Tutor</span>
+              </button>
+              <button onClick={() => setCurrentView('notes')} className="flex items-center space-x-2 text-gray-700 hover:text-indigo-600 transition-colors">
+                <FileText className="w-5 h-5" />
+                <span>Notes</span>
               </button>
               <button onClick={() => setCurrentView('analytics')} className="flex items-center space-x-2 text-gray-700 hover:text-indigo-600 transition-colors">
                 <BarChart3 className="w-5 h-5" />
@@ -389,9 +451,9 @@ export default function QuizLearningApp() {
                 <h3 className="text-xl font-bold text-gray-900 mb-2">{topic.name}</h3>
                 <p className="text-gray-600 mb-4">{topic.description}</p>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500">{topic.quizCount || 0} quizzes</span>
+                  <span className="text-sm text-gray-500">{topic.quizCount || 0} questions</span>
                   <button onClick={() => startQuiz(topic)} className="flex items-center space-x-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors">
-                    <span>Start Quiz</span>
+                    <span>Start Quiz (10 Questions)</span>
                     <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
@@ -561,6 +623,26 @@ export default function QuizLearningApp() {
   };
 
   const ChatbotView = () => {
+    // Load chat history when component mounts
+    useEffect(() => {
+      const loadChatHistory = async () => {
+        try {
+          const response = await api.get('/chat/history');
+          const history = response as Array<{ text: string; sender: string; timestamp: string }>;
+          const messages: ChatMessage[] = history.map((msg, index) => ({
+            id: index,
+            text: msg.text,
+            sender: msg.sender as 'user' | 'ai',
+            timestamp: new Date(msg.timestamp)
+          }));
+          setChatMessages(messages);
+        } catch (error) {
+          console.log('No chat history or failed to load');
+        }
+      };
+      loadChatHistory();
+    }, []);
+
     const sendMessage = async () => {
       if (!chatInput.trim()) return;
 
@@ -576,12 +658,13 @@ export default function QuizLearningApp() {
       setIsTyping(true);
 
       try {
-        const response = await api.post('/chatbot/message', { message: currentInput });
-        const botResponse = response as { reply: string; error?: string };
+        // Send to new chat controller
+        const response = await api.post('/chat/message', { message: currentInput });
+        const botResponse = response as { response: string };
         
         const botMessage: ChatMessage = { 
           id: Date.now() + 1, 
-          text: botResponse.reply || botResponse.error || "I'm having trouble responding right now.", 
+          text: botResponse.response || "I'm having trouble responding right now.", 
           sender: 'ai', 
           timestamp: new Date() 
         };
@@ -656,7 +739,14 @@ export default function QuizLearningApp() {
                         <span className="text-xs font-semibold text-indigo-600">🤖 Skilli</span>
                       </div>
                     )}
-                    <p className="whitespace-pre-wrap">{msg.text}</p>
+                    {msg.sender === 'ai' ? (
+                      <div 
+                        className="message-content"
+                        dangerouslySetInnerHTML={{ __html: formatMessage(msg.text) }}
+                      />
+                    ) : (
+                      <p className="whitespace-pre-wrap">{msg.text}</p>
+                    )}
                     <span className="text-xs opacity-70 mt-1 block">
                       {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
@@ -705,8 +795,90 @@ export default function QuizLearningApp() {
     );
   };
 
-  const AnalyticsView = () => (
-    <div className="min-h-screen bg-gray-50">
+  const NotesView = () => {
+    const [notes, setNotes] = useState<Note[]>([]);
+    const [notesLoading, setNotesLoading] = useState(true);
+    const [notesError, setNotesError] = useState('');
+
+    // Load notes from backend on component mount
+    useEffect(() => {
+      const fetchNotes = async () => {
+        try {
+          setNotesLoading(true);
+          const response = await api.get('/notes');
+          const notesData = response as Note[];
+          setNotes(notesData);
+          setNotesError('');
+        } catch (err) {
+          console.error('Failed to fetch notes:', err);
+          setNotesError('Failed to load notes. Please try again.');
+        } finally {
+          setNotesLoading(false);
+        }
+      };
+      fetchNotes();
+    }, []);
+
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <nav className="bg-white shadow-sm border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div className="flex items-center space-x-3">
+              <FileText className="w-8 h-8 text-indigo-600" />
+              <h1 className="text-2xl font-bold text-gray-900">My Notes</h1>
+            </div>
+            <button onClick={() => setCurrentView('dashboard')} className="text-gray-600 hover:text-gray-900 transition-colors">← Back to Dashboard</button>
+          </div>
+        </nav>
+
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Study Notes</h2>
+              <p className="text-gray-600 mt-1">Your learning materials from backend</p>
+            </div>
+            <span className="status-badge status-badge--success">
+              ✓ Loaded from backend
+            </span>
+          </div>
+
+          {notesLoading && (
+            <div className="loading text-center py-12">
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+              <p className="mt-4 text-gray-600">Loading notes...</p>
+            </div>
+          )}
+
+          {notesError && (
+            <div className="error text-center py-12">
+              <p className="text-red-600 text-lg">{notesError}</p>
+            </div>
+          )}
+
+          {!notesLoading && !notesError && (
+            <div className="notes-grid">
+              {notes.map(note => (
+                <div key={note.id} className="note-card">
+                  <div className="note-category">{note.subject}</div>
+                  <h3 className="note-title">{note.title}</h3>
+                  <p className="note-content">{note.content}</p>
+                  <div className="note-footer">
+                    <span className="note-date">
+                      {new Date(note.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const AnalyticsView = () => {
+    return (
+      <div className="min-h-screen bg-gray-50">
       <nav className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center space-x-3">
@@ -718,18 +890,34 @@ export default function QuizLearningApp() {
       </nav>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <h3 className="text-gray-600 text-sm font-medium mb-2">Total Quizzes</h3>
-            <p className="text-3xl font-bold text-indigo-600">12</p>
+        <div className="dashboard-stats">
+          <div className="stat-card stat-card--streak">
+            <div className="stat-icon">🔥</div>
+            <div className="stat-content">
+              <div className="stat-value">5</div>
+              <div className="stat-label">Day Streak</div>
+            </div>
           </div>
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <h3 className="text-gray-600 text-sm font-medium mb-2">Average Score</h3>
-            <p className="text-3xl font-bold text-green-600">78%</p>
+          <div className="stat-card stat-card--quizzes">
+            <div className="stat-icon">📝</div>
+            <div className="stat-content">
+              <div className="stat-value">12</div>
+              <div className="stat-label">Quizzes Completed</div>
+            </div>
           </div>
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <h3 className="text-gray-600 text-sm font-medium mb-2">Study Streak</h3>
-            <p className="text-3xl font-bold text-orange-600">5 days</p>
+          <div className="stat-card stat-card--accuracy">
+            <div className="stat-icon">🎯</div>
+            <div className="stat-content">
+              <div className="stat-value">78%</div>
+              <div className="stat-label">Average Accuracy</div>
+            </div>
+          </div>
+          <div className="stat-card stat-card--weak">
+            <div className="stat-icon">📚</div>
+            <div className="stat-content">
+              <div className="stat-value">3</div>
+              <div className="stat-label">Weak Subjects</div>
+            </div>
           </div>
         </div>
 
@@ -751,7 +939,8 @@ export default function QuizLearningApp() {
         </div>
       </div>
     </div>
-  );
+    );
+  };
 
   return (
     <div>
@@ -760,6 +949,7 @@ export default function QuizLearningApp() {
       {currentView === 'quiz' && <QuizView />}
       {currentView === 'results' && <ResultsView />}
       {currentView === 'chatbot' && <ChatbotView />}
+      {currentView === 'notes' && <NotesView />}
       {currentView === 'analytics' && <AnalyticsView />}
     </div>
   );

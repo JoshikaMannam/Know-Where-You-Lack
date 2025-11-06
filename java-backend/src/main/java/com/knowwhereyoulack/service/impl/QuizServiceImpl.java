@@ -5,6 +5,7 @@ import com.knowwhereyoulack.model.Question;
 import com.knowwhereyoulack.model.Topic;
 import com.knowwhereyoulack.repository.QuestionRepository;
 import com.knowwhereyoulack.repository.TopicRepository;
+import com.knowwhereyoulack.repository.QuestionOptionsRepository;
 import com.knowwhereyoulack.service.QuizService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -17,12 +18,15 @@ public class QuizServiceImpl implements QuizService {
     
     private final QuestionRepository questionRepository;
     private final TopicRepository topicRepository;
+    private final QuestionOptionsRepository questionOptionsRepository;
     
     @Autowired
     public QuizServiceImpl(QuestionRepository questionRepository, 
-                           TopicRepository topicRepository) {
+                           TopicRepository topicRepository,
+                           QuestionOptionsRepository questionOptionsRepository) {
         this.questionRepository = questionRepository;
         this.topicRepository = topicRepository;
+        this.questionOptionsRepository = questionOptionsRepository;
     }
     
     @Override
@@ -65,5 +69,19 @@ public class QuizServiceImpl implements QuizService {
     public List<Question> getAllQuestionsByTopic(Long topicId) {
         // FIXED: Changed from findByTopicTopicId to findByTopicId
         return questionRepository.findByTopicId(topicId);
+    }
+    
+    /**
+     * Get options for a specific question from question_options table
+     */
+    public List<String> getQuestionOptions(Long questionId) {
+        return questionOptionsRepository.findOptionsByQuestionId(questionId);
+    }
+    
+    /**
+     * Get random questions by SUBJECT (across all topics)
+     */
+    public List<Question> getQuestionsBySubject(Long subjectId, int limit) {
+        return questionRepository.findRandomQuestionsBySubject(subjectId, limit);
     }
 }

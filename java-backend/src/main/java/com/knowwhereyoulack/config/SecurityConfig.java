@@ -103,6 +103,9 @@ public class SecurityConfig {
                 // Quiz topics - public so users can see available quizzes before login
                 .requestMatchers(HttpMethod.GET, "/api/quiz/topics").permitAll()
                 
+                // ✅ QUIZ ENDPOINTS - PUBLIC (No authentication required)
+                .requestMatchers(HttpMethod.GET, "/api/quiz/**").permitAll()
+                
                 // Chatbot endpoint - PUBLIC for now (no JWT required)
                 // ✅ THIS IS THE KEY LINE FOR GROQ CHATBOT
                 .requestMatchers(HttpMethod.POST, "/api/chatbot/message").permitAll()
@@ -117,8 +120,8 @@ public class SecurityConfig {
                 // Admin-only endpoints
                 .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "TEACHER")
                 
-                // Student endpoints (require STUDENT role)
-                .requestMatchers("/api/quiz/**", "/api/analysis/**", "/api/recommendations/**").hasRole("STUDENT")
+                // Student endpoints - COMMENTED OUT for testing (require STUDENT role)
+                // .requestMatchers("/api/quiz/**", "/api/analysis/**", "/api/recommendations/**").hasRole("STUDENT")
                 
                 // Topics endpoint - accessible to authenticated users
                 .requestMatchers("/api/topics/**").authenticated()

@@ -10,7 +10,7 @@ public class MLPredictionServiceImpl implements MLPredictionService {
 
     @Override
     public WeaknessAnalysisResponse predictWeakness(Long userId) {
-        // TODO: Replace this with Python API or ONNX model call
+        //note currently returns mock data. Replace with Python API or ONNX
         WeaknessAnalysisResponse response = new WeaknessAnalysisResponse();
         response.setTopicName("DSA");
         response.setWeaknessLevel("Weak");

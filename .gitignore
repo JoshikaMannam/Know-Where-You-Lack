@@ -34,8 +34,11 @@ target/
 *.jar
 !**/src/main/resources/**/*.jar
 
-# Environment
+# Environment Variables (exclude .env but keep .env.example)
 .env
+.env.local
+.env.*.local
+!.env.example
 .venv
 venv/
 env/

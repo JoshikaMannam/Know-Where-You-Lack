@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import DifficultySlider from './components/DifficultySlider';
 import { quizApi } from './services/quizApi';
-import Login from './components/Login';
 import axios from 'axios';
 import {
   LayoutDashboard,
@@ -1147,7 +1145,6 @@ const QuizView: React.FC<{
 }> = ({ onQuizComplete }) => {
   const [topics] = useState<Topic[]>(MOCK_TOPICS);
   const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
-  const [selectedDifficulty, setSelectedDifficulty] = useState<'EASY' | 'MEDIUM' | 'HARD'>('MEDIUM');
   const [quiz, setQuiz] = useState<Question[] | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<{ [key: string]: string }>({});
@@ -1180,23 +1177,33 @@ const QuizView: React.FC<{
     setSelectedTopic(topic);
     
     try {
-      // ✅ Use quizApi service to fetch questions
-      console.log(`🚀 Fetching ${selectedDifficulty} questions for topic ${topicId}...`);
-      const quizData = await quizApi.getQuestionsByDifficulty(topicId, selectedDifficulty);
+      // ✅ Fetch 10 random questions from SUBJECT (across all topics)
+      console.log(`🚀 Fetching 10 questions for subject ${topicId}...`);
+      const response = await fetch(`http://localhost:8082/api/quiz/${topicId}?questionCount=10`);
+      const backendQuestions = await response.json();
+      
+      console.log(`✅ Received ${backendQuestions.length} questions from backend`);
+      console.log('📋 First question structure:', JSON.stringify(backendQuestions[0], null, 2));
       
       // Transform backend questions to frontend format
-      const transformedQuestions: Question[] = quizData.questions?.map((q) => ({
-        id: q.questionId?.toString(),
-        text: q.questionText,
-        topic: topic.name,
-        options: [
-          { id: 'A', text: 'Option A' },
-          { id: 'B', text: 'Option B' },
-          { id: 'C', text: 'Option C' },
-          { id: 'D', text: 'Option D' }
-        ],
-        correctOptionId: q.correctAnswer || 'A'
-      })) || [];
+      const transformedQuestions: Question[] = backendQuestions.map((q: any, index: number) => {
+        console.log(`Question ${index + 1}:`, q.questionText);
+        console.log(`Options for question ${index + 1}:`, q.options);
+        
+        return {
+          id: q.id?.toString() || index.toString(),
+          text: q.questionText,
+          topic: topic.name,
+          options: q.options?.map((opt: string, i: number) => ({
+            id: String.fromCharCode(65 + i), // A, B, C, D
+            text: opt
+          })) || [],
+          correctOptionId: 'A' // TODO: Get from backend
+        };
+      });
+      
+      console.log('✅ Transformed questions:', transformedQuestions.length);
+      console.log('📋 First transformed question:', transformedQuestions[0]);
       
       if (transformedQuestions.length > 0) {
         setQuiz(transformedQuestions);
@@ -1219,17 +1226,6 @@ const QuizView: React.FC<{
     setIsFinished(false);
     setFinalScore(0);
     setLoading(false);
-  };
-
-  // Handle difficulty change - reload quiz if already started
-  const handleDifficultyChange = async (newDifficulty: 'EASY' | 'MEDIUM' | 'HARD') => {
-    setSelectedDifficulty(newDifficulty);
-    
-    // If a quiz is already started, reload questions with new difficulty
-    if (selectedTopic && !isFinished) {
-      console.log(`🔄 Reloading quiz with ${newDifficulty} difficulty...`);
-      await startQuiz(selectedTopic.id);
-    }
   };
 
   const handleAnswer = (questionId: string, optionId: string) => {
@@ -1416,14 +1412,10 @@ const QuizView: React.FC<{
             <X size={24} />
           </button>
           <h2 className="text-3xl font-bold text-primary mb-4">{topicInfo.topic.name}</h2>
-          <p className="text-lg text-secondary mb-2">{topicInfo.topic.description}</p>
-          <div className="flex items-center space-x-6 my-6">
-            <span className="text-lg text-secondary">
-              Difficulty: <span className="font-bold text-primary">{topicInfo.topic.difficulty}</span>
-            </span>
-            <span className="text-lg text-secondary">
-              Questions: <span className="font-bold text-primary">{topicInfo.count > 10 ? '10' : topicInfo.count}</span>
-            </span>
+          <p className="text-lg text-secondary mb-6">{topicInfo.topic.description}</p>
+          <div className="text-center mb-6">
+            <p className="text-2xl font-bold text-primary mb-2">Ready for a Quiz?</p>
+            <p className="text-lg text-secondary">10 Questions</p>
           </div>
           <button
             onClick={onStart}
@@ -1440,12 +1432,6 @@ const QuizView: React.FC<{
   return (
     <div className="p-10 bg-secondary min-h-full">
       <h1 className="text-5xl font-bold text-primary mb-6">Choose a Topic</h1>
-      
-      {/* Difficulty Slider Component */}
-      <DifficultySlider 
-        selectedDifficulty={selectedDifficulty}
-        onDifficultyChange={handleDifficultyChange}
-      />
 
       <div className="flex flex-wrap gap-10 justify-center">
         {topics.map(topic => (
@@ -1453,8 +1439,8 @@ const QuizView: React.FC<{
             key={topic.id}
             topic={topic}
             onClick={() => {
-              const qCount = MOCK_QUIZ.filter(q => q.topic === topic.name).length;
-              setTopicToStart({ topic: topic, count: qCount });
+              // ✅ Always set to 10 questions (backend will return 10 random questions)
+              setTopicToStart({ topic: topic, count: 10 });
             }}
           />
         ))}
@@ -1693,10 +1679,6 @@ const FloatingSkilli: React.FC<{ onClick: () => void }> = ({ onClick }) => {
 // --- Main App Component ---
 
 const App: React.FC = () => {
-  // ✅ ADD: Authentication state
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  
   const [currentPage, setCurrentPage] = useState<string>('dashboard');
   const [theme, setTheme] = useState<Theme>('light');
   
@@ -1709,51 +1691,22 @@ const App: React.FC = () => {
   const [quizAccuracy, setQuizAccuracy] = useState<QuizAccuracy[]>(INITIAL_QUIZ_ACCURACY);
   const [weeklyStreak, setWeeklyStreak] = useState<number>(INITIAL_WEEKLY_STREAK);
 
-  // ✅ ADD: Check authentication on mount
+  // ✅ ADD: Check authentication on mount - SKIP FOR DEMO
   useEffect(() => {
-    const checkAuth = async () => {
-      const token = localStorage.getItem('jwt_token');
-      const savedUser = localStorage.getItem('user_data');
-      
-      if (token && savedUser) {
-        try {
-          // Verify token is still valid
-          const response = await axios.get(`${API_BASE_URL}/auth/me`);
-          setUserData(response.data);
-          setIsAuthenticated(true);
-        } catch (error) {
-          console.error('Token invalid, logging out:', error);
-          handleLogout();
-        }
-      }
-      setIsCheckingAuth(false);
-    };
-    
-    checkAuth();
+    // Dashboard loads directly for demo
   }, []);
 
   useEffect(() => {
     document.documentElement.className = theme;
   }, [theme]);
   
-  // ✅ ADD: Login handler
-  const handleLoginSuccess = (user: UserData & { token: string }) => {
-    setUserData({
-      userId: user.userId,
-      name: user.name,
-      email: user.email
-    });
-    setIsAuthenticated(true);
-    console.log('✅ User logged in:', user);
-  };
-
   // ✅ ADD: Logout handler
   const handleLogout = () => {
     localStorage.removeItem('jwt_token');
     localStorage.removeItem('user_data');
-    setIsAuthenticated(false);
     setUserData(MOCK_USER_DATA);
     setCurrentPage('dashboard');
+    alert('Logged out successfully');
   };
   
   const handleQuizComplete = (score: number, total: number) => {
@@ -1769,19 +1722,7 @@ const App: React.FC = () => {
     setCurrentPage('dashboard');
   };
 
-  // ✅ ADD: Show loading while checking auth
-  if (isCheckingAuth) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <Loader2 className="w-12 h-12 animate-spin text-indigo-600" />
-      </div>
-    );
-  }
-
-  // ✅ ADD: Show login page if not authenticated
-  if (!isAuthenticated) {
-    return <Login onLoginSuccess={handleLoginSuccess} />;
-  }
+  // ✅ SKIP AUTH FOR DEMO - GO DIRECTLY TO DASHBOARD
 
   return (
     <>

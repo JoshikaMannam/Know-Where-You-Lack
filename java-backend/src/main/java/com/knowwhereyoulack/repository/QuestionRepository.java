@@ -77,4 +77,17 @@ public interface QuestionRepository extends JpaRepository<Question, Long> {
         @Param("topicId") Long topicId, 
         @Param("difficulty") String difficulty
     );
+    
+    /**
+     * Get random questions by SUBJECT (across all topics in that subject)
+     */
+    @Query(value = "SELECT q.* FROM questions q " +
+                   "JOIN topics t ON q.topic_id = t.topic_id " +
+                   "WHERE t.subject_id = :subjectId AND q.is_active = 1 " +
+                   "ORDER BY RAND() LIMIT :limit", 
+           nativeQuery = true)
+    List<Question> findRandomQuestionsBySubject(
+        @Param("subjectId") Long subjectId,
+        @Param("limit") int limit
+    );
 }
