@@ -1,10 +1,10 @@
 services:
   - type: web
     name: knowwhereyoulack-backend
-    runtime: java
+    runtime: docker
     rootDir: java-backend
-    buildCommand: mvn clean install -DskipTests
-    startCommand: java -jar target/backend-1.0.0.jar
+    plan: free
+    branch: main
     envVars:
       - key: DB_URL
         sync: false
