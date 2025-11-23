@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { quizApi } from './services/quizApi';
 import axios from 'axios';
+import Login from './components/Login';
 import {
   LayoutDashboard,
   Brain,
@@ -1682,6 +1683,10 @@ const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<string>('dashboard');
   const [theme, setTheme] = useState<Theme>('light');
   
+  // ✅ Authentication state
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState<boolean>(true);
+  
   // ✅ CHANGE: Get userData from localStorage instead of mock
   const [userData, setUserData] = useState<UserData>(() => {
     const saved = localStorage.getItem('user_data');
@@ -1691,22 +1696,50 @@ const App: React.FC = () => {
   const [quizAccuracy, setQuizAccuracy] = useState<QuizAccuracy[]>(INITIAL_QUIZ_ACCURACY);
   const [weeklyStreak, setWeeklyStreak] = useState<number>(INITIAL_WEEKLY_STREAK);
 
-  // ✅ ADD: Check authentication on mount - SKIP FOR DEMO
+  // ✅ Check authentication on mount
   useEffect(() => {
-    // Dashboard loads directly for demo
+    const checkAuth = () => {
+      const token = localStorage.getItem('jwt_token');
+      const savedUserData = localStorage.getItem('user_data');
+      
+      if (token && savedUserData) {
+        setIsAuthenticated(true);
+        setUserData(JSON.parse(savedUserData));
+        console.log('✅ User already authenticated');
+      } else {
+        setIsAuthenticated(false);
+        console.log('❌ User not authenticated');
+      }
+      
+      setIsCheckingAuth(false);
+    };
+    
+    checkAuth();
   }, []);
 
   useEffect(() => {
     document.documentElement.className = theme;
   }, [theme]);
   
-  // ✅ ADD: Logout handler
+  // ✅ Handle login success
+  const handleLoginSuccess = (data: { userId: number; name: string; email: string; token: string }) => {
+    setUserData({
+      userId: data.userId,
+      name: data.name,
+      email: data.email
+    });
+    setIsAuthenticated(true);
+    console.log('✅ Login successful, redirecting to dashboard...');
+  };
+  
+  // ✅ Logout handler
   const handleLogout = () => {
     localStorage.removeItem('jwt_token');
     localStorage.removeItem('user_data');
     setUserData(MOCK_USER_DATA);
+    setIsAuthenticated(false);
     setCurrentPage('dashboard');
-    alert('Logged out successfully');
+    console.log('✅ Logged out successfully');
   };
   
   const handleQuizComplete = (score: number, total: number) => {
@@ -1722,8 +1755,24 @@ const App: React.FC = () => {
     setCurrentPage('dashboard');
   };
 
-  // ✅ SKIP AUTH FOR DEMO - GO DIRECTLY TO DASHBOARD
+  // ✅ Show loading while checking authentication
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-16 h-16 text-white animate-spin mx-auto mb-4" />
+          <p className="text-white text-xl font-semibold">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
+  // ✅ Show Login page if not authenticated
+  if (!isAuthenticated) {
+    return <Login onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  // ✅ Show main app if authenticated
   return (
     <>
       <GlobalStyles />
