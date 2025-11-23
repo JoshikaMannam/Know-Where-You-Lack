@@ -4,9 +4,7 @@ import '../styles/Chatbot.css';
 import '../styles/Quiz.css';
 import '../styles/Dashboard.css';
 import '../styles/Notes.css';
-
-// Temporarily point frontend to backend port 8082 to avoid conflicts with services
-const API_BASE_URL = 'http://localhost:8082/api';
+import { API_BASE_URL } from '../config/api';
 
 interface ApiError {
   message: string;

@@ -98,7 +98,7 @@ interface QuizAccuracy {
   accuracy: number;
 }
 
-const API_BASE_URL = 'http://localhost:8082/api';
+import { API_BASE_URL } from './config/api';
 
 const MOCK_USER_DATA: UserData = {
   userId: 1,

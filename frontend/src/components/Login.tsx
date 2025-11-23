@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { BookMarked, Mail, Lock, Loader2, Eye, EyeOff } from 'lucide-react';
 import axios from 'axios';
-
-const API_BASE_URL = 'http://localhost:8082/api';
+import { API_BASE_URL } from '../config/api';
 
 interface LoginProps {
   onLoginSuccess: (userData: { userId: number; name: string; email: string; token: string }) => void;
